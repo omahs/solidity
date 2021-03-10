@@ -419,15 +419,9 @@ evmc::result EVMHost::precompileECRecover(evmc_message const& _message) noexcept
 		}
 	};
 	evmc::result result = precompileGeneric(_message, inputOutput);
-	// ECRecover will return success with empty response in case of failure
-	if (result.status_code != EVMC_SUCCESS)
-	{
-		result.status_code = EVMC_SUCCESS;
-		result.gas_left = _message.gas;
-		result.output_data = {};
-		result.output_size = 0;
-	}
-	return result;
+	result.status_code = EVMC_SUCCESS;
+	result.gas_left = _message.gas;
+	return precompileValidateGasUsage(std::move(result), evmasm::GasCosts::precompileEcrecoverGas);
 }
 
 evmc::result EVMHost::precompileSha256(evmc_message const& _message) noexcept
@@ -439,7 +433,15 @@ evmc::result EVMHost::precompileSha256(evmc_message const& _message) noexcept
 		_message.input_data + _message.input_size
 	));
 
-	return resultWithGas(_message, hash);
+	int64_t gas_cost = evmasm::GasCosts::precompileSha256BaseGas;
+	gas_cost += ((_message.input_size + 31) / 32) * int64_t{evmasm::GasCosts::precompileSha256PerWordGas};
+
+	evmc::result result({});
+	result.status_code = EVMC_SUCCESS;
+	result.gas_left = _message.gas;
+	result.output_data = hash.data();
+	result.output_size = hash.size();
+	return precompileValidateGasUsage(std::move(result), gas_cost);
 }
 
 evmc::result EVMHost::precompileRipeMD160(evmc_message const& _message) noexcept
@@ -514,7 +516,15 @@ evmc::result EVMHost::precompileIdentity(evmc_message const& _message) noexcept
 	bytes static data;
 	data = bytes(_message.input_data, _message.input_data + _message.input_size);
 
-	return resultWithGas(_message, data);
+	int64_t gas_cost = evmasm::GasCosts::precompileIdentityBaseGas;
+	gas_cost += ((_message.input_size + 31) / 32) * int64_t{evmasm::GasCosts::precompileIdentityPerWordGas};
+
+	evmc::result result({});
+	result.status_code = EVMC_SUCCESS;
+	result.gas_left = _message.gas;
+	result.output_data = data.data();
+	result.output_size = data.size();
+	return precompileValidateGasUsage(std::move(result), gas_cost);
 }
 
 evmc::result EVMHost::precompileModExp(evmc_message const&) noexcept
@@ -948,6 +958,19 @@ evmc::result EVMHost::resultWithFailure() noexcept
 {
 	evmc::result result({});
 	result.status_code = EVMC_FAILURE;
+	return result;
+}
+
+evmc::result EVMHost::precompileValidateGasUsage(evmc::result result, int64_t gas) noexcept
+{
+	// We assume result.gas_left is set to the input message.gas
+	if (result.gas_left < gas)
+	{
+		result.status_code = EVMC_OUT_OF_GAS;
+		result.gas_left = 0;
+	}
+	else
+		result.gas_left -= gas;
 	return result;
 }
 
