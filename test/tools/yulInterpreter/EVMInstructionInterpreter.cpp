@@ -181,7 +181,7 @@ u256 EVMInstructionInterpreter::eval(
 	// --------------- blockchain stuff ---------------
 	case Instruction::KECCAK256:
 	{
-		if (!accessMemory(arg[0], arg[1]))
+		if (arg[1] != 0 && !accessMemory(arg[0], arg[1]))
 			return u256("0x1234cafe1234cafe1234cafe") + arg[0];
 		uint64_t offset = uint64_t(arg[0] & uint64_t(-1));
 		uint64_t size = uint64_t(arg[1] & uint64_t(-1));
@@ -207,22 +207,28 @@ u256 EVMInstructionInterpreter::eval(
 	case Instruction::CALLDATASIZE:
 		return m_state.calldata.size();
 	case Instruction::CALLDATACOPY:
-		logTrace(_instruction, arg);
-		if (accessMemory(arg[0], arg[2]))
-			copyZeroExtended(
-				m_state.memory, m_state.calldata,
-				size_t(arg[0]), size_t(arg[1]), size_t(arg[2])
-			);
+		if (arg[2] != 0)
+		{
+			if (accessMemory(arg[0], arg[2]))
+				copyZeroExtended(
+					m_state.memory, m_state.calldata,
+					size_t(arg[0]), size_t(arg[1]), size_t(arg[2])
+				);
+			logTrace(_instruction, arg);
+		}
 		return 0;
 	case Instruction::CODESIZE:
 		return m_state.code.size();
 	case Instruction::CODECOPY:
-		logTrace(_instruction, arg);
-		if (accessMemory(arg[0], arg[2]))
-			copyZeroExtended(
-				m_state.memory, m_state.code,
-				size_t(arg[0]), size_t(arg[1]), size_t(arg[2])
-			);
+		if (arg[2] != 0)
+		{
+			if (accessMemory(arg[0], arg[2]))
+				copyZeroExtended(
+					m_state.memory, m_state.code,
+					size_t(arg[0]), size_t(arg[1]), size_t(arg[2])
+				);
+			logTrace(_instruction, arg);
+		}
 		return 0;
 	case Instruction::GASPRICE:
 		return m_state.gasprice;
@@ -235,23 +241,29 @@ u256 EVMInstructionInterpreter::eval(
 	case Instruction::EXTCODEHASH:
 		return u256(keccak256(h256(arg[0] + 1)));
 	case Instruction::EXTCODECOPY:
-		logTrace(_instruction, arg);
-		if (accessMemory(arg[1], arg[3]))
-			// TODO this way extcodecopy and codecopy do the same thing.
-			copyZeroExtended(
-				m_state.memory, m_state.code,
-				size_t(arg[1]), size_t(arg[2]), size_t(arg[3])
-			);
+		if (arg[3] != 0)
+		{
+			if (accessMemory(arg[1], arg[3]))
+				// TODO this way extcodecopy and codecopy do the same thing.
+				copyZeroExtended(
+					m_state.memory, m_state.code,
+					size_t(arg[1]), size_t(arg[2]), size_t(arg[3])
+				);
+			logTrace(_instruction, arg);
+		}
 		return 0;
 	case Instruction::RETURNDATASIZE:
 		return m_state.returndata.size();
 	case Instruction::RETURNDATACOPY:
-		logTrace(_instruction, arg);
-		if (accessMemory(arg[0], arg[2]))
-			copyZeroExtended(
-				m_state.memory, m_state.returndata,
-				size_t(arg[0]), size_t(arg[1]), size_t(arg[2])
-			);
+		if (arg[2] != 0)
+		{
+			if (accessMemory(arg[0], arg[2]))
+				copyZeroExtended(
+					m_state.memory, m_state.returndata,
+					size_t(arg[0]), size_t(arg[1]), size_t(arg[2])
+				);
+			logTrace(_instruction, arg);
+		}
 		return 0;
 	case Instruction::BLOCKHASH:
 		if (arg[0] >= m_state.blockNumber || arg[0] + 256 < m_state.blockNumber)
@@ -292,58 +304,93 @@ u256 EVMInstructionInterpreter::eval(
 	case Instruction::GAS:
 		return 0x99;
 	case Instruction::LOG0:
-		accessMemory(arg[0], arg[1]);
-		logTrace(_instruction, arg);
+		if (arg[1] != 0)
+		{
+			accessMemory(arg[0], arg[1]);
+			logTrace(_instruction, arg);
+		}
 		return 0;
 	case Instruction::LOG1:
-		accessMemory(arg[0], arg[1]);
-		logTrace(_instruction, arg);
+		if (arg[1] != 0)
+		{
+			accessMemory(arg[0], arg[1]);
+			logTrace(_instruction, arg);
+		}
 		return 0;
 	case Instruction::LOG2:
-		accessMemory(arg[0], arg[1]);
-		logTrace(_instruction, arg);
+		if (arg[1] != 0)
+		{
+			accessMemory(arg[0], arg[1]);
+			logTrace(_instruction, arg);
+		}
 		return 0;
 	case Instruction::LOG3:
-		accessMemory(arg[0], arg[1]);
-		logTrace(_instruction, arg);
+		if (arg[1] != 0)
+		{
+			accessMemory(arg[0], arg[1]);
+			logTrace(_instruction, arg);
+		}
 		return 0;
 	case Instruction::LOG4:
-		accessMemory(arg[0], arg[1]);
-		logTrace(_instruction, arg);
+		if (arg[1] != 0)
+		{
+			accessMemory(arg[0], arg[1]);
+			logTrace(_instruction, arg);
+		}
 		return 0;
 	// --------------- calls ---------------
 	case Instruction::CREATE:
-		accessMemory(arg[1], arg[2]);
-		logTrace(_instruction, arg);
-		return (0xcccccc + arg[1]) & u256("0xffffffffffffffffffffffffffffffffffffffff");
+		if (arg[2] != 0)
+		{
+			accessMemory(arg[1], arg[2]);
+			logTrace(_instruction, arg);
+			return (0xcccccc + arg[1]) & u256("0xffffffffffffffffffffffffffffffffffffffff");
+		}
+		return 0xcccccc;
 	case Instruction::CREATE2:
-		accessMemory(arg[1], arg[2]);
-		logTrace(_instruction, arg);
-		return (0xdddddd + arg[1]) & u256("0xffffffffffffffffffffffffffffffffffffffff");
+		if (arg[2] != 0)
+		{
+			accessMemory(arg[1], arg[2]);
+			logTrace(_instruction, arg);
+			return (0xdddddd + arg[1]) & u256("0xffffffffffffffffffffffffffffffffffffffff");
+		}
+		return 0xdddddd;
 	case Instruction::CALL:
 	case Instruction::CALLCODE:
 		// TODO assign returndata
-		accessMemory(arg[3], arg[4]);
-		accessMemory(arg[5], arg[6]);
-		logTrace(_instruction, arg);
-		return arg[0] & 1;
+		if (arg[4] != 0)
+			accessMemory(arg[3], arg[4]);
+		if (arg[6] != 0)
+			accessMemory(arg[5], arg[6]);
+		if (arg[4] != 0 && arg[6] != 0)
+			logTrace(_instruction, arg);
+		return 1;
 	case Instruction::DELEGATECALL:
 	case Instruction::STATICCALL:
-		accessMemory(arg[2], arg[3]);
-		accessMemory(arg[4], arg[5]);
-		logTrace(_instruction, arg);
+		if (arg[3] != 0)
+			accessMemory(arg[2], arg[3]);
+		if (arg[5] != 0)
+			accessMemory(arg[4], arg[5]);
+		if (arg[3] != 0 && arg[5] != 0)
+			logTrace(_instruction, arg);
 		return 0;
 	case Instruction::RETURN:
 	{
 		bytes data;
-		if (accessMemory(arg[0], arg[1]))
-			data = readMemory(arg[0], arg[1]);
-		logTrace(_instruction, arg, data);
+		if (arg[1] != 0)
+		{
+			if (accessMemory(arg[0], arg[1]))
+				data = readMemory(arg[0], arg[1]);
+			logTrace(_instruction, arg, data);
+		}
 		BOOST_THROW_EXCEPTION(ExplicitlyTerminated());
 	}
 	case Instruction::REVERT:
-		accessMemory(arg[0], arg[1]);
-		logTrace(_instruction, arg);
+		if (arg[1] != 0)
+		{
+			accessMemory(arg[0], arg[1]);
+			logTrace(_instruction, arg);
+		}
 		m_state.storage.clear();
 		m_state.trace.clear();
 		BOOST_THROW_EXCEPTION(ExplicitlyTerminated());
@@ -465,7 +512,10 @@ u256 EVMInstructionInterpreter::evalBuiltin(
 	else if (fun == "datacopy")
 	{
 		// This is identical to codecopy.
-		if (accessMemory(_evaluatedArguments.at(0), _evaluatedArguments.at(2)))
+		if (
+				_evaluatedArguments.at(2) != 0 &&
+				accessMemory(_evaluatedArguments.at(0), _evaluatedArguments.at(2))
+		)
 			copyZeroExtended(
 				m_state.memory,
 				m_state.code,
