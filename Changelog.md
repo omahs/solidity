@@ -5,6 +5,7 @@ Language Features:
 
 Compiler Features:
 * Yul Optimizer: Allow replacing the previously hard-coded cleanup sequence by specifying custom steps after a colon delimiter (``:``) in the sequence string.
+* Language Server: Implements finding all references as well as semantic highlighting of symbols.
 
 
 Bugfixes:
@@ -20,7 +21,6 @@ Compiler Features:
  * Code Generator: More efficient overflow checks for multiplication.
  * Language Server: Analyze all files in a project by default (can be customized by setting ``'file-load-strategy'`` to ``'directly-opened-and-on-import'`` in LSP settings object).
  * Yul Optimizer: Simplify the starting offset of zero-length operations to zero.
- * Language Server: Implements finding all references as well as semantic highlighting of symbols.
 
 
 Bugfixes:
