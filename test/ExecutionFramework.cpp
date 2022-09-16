@@ -174,16 +174,19 @@ void ExecutionFramework::sendMessage(bytes const& _data, bool _isCreation, u256 
 	if (_isCreation)
 	{
 		message.kind = EVMC_CREATE;
-		message.destination = EVMHost::convertToEVMC(h160{});
+		message.recipient = {};
+		message.code_address = {};
 	}
 	else
 	{
 		message.kind = EVMC_CALL;
-		message.destination = EVMHost::convertToEVMC(m_contractAddress);
+		message.recipient = EVMHost::convertToEVMC(m_contractAddress);
+		message.code_address = message.recipient;
 	}
+
 	message.gas = InitialGas.convert_to<int64_t>();
 
-	evmc::result result = m_evmcHost->call(message);
+	evmc::Result result = m_evmcHost->call(message);
 
 	m_output = bytes(result.output_data, result.output_data + result.output_size);
 	if (_isCreation)
@@ -214,7 +217,7 @@ void ExecutionFramework::sendEther(h160 const& _addr, u256 const& _amount)
 	message.sender = EVMHost::convertToEVMC(m_sender);
 	message.value = EVMHost::convertToEVMC(_amount);
 	message.kind = EVMC_CALL;
-	message.destination = EVMHost::convertToEVMC(_addr);
+	message.recipient = EVMHost::convertToEVMC(_addr);
 	message.gas = InitialGas.convert_to<int64_t>();
 
 	m_evmcHost->call(message);
@@ -282,7 +285,7 @@ bool ExecutionFramework::storageEmpty(h160 const& _addr) const
 	if (it != m_evmcHost->accounts.end())
 	{
 		for (auto const& entry: it->second.storage)
-			if (!(entry.second.value == evmc::bytes32{}))
+			if (!(entry.second.current == evmc::bytes32{}))
 				return false;
 	}
 	return true;

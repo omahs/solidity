@@ -125,7 +125,7 @@ EVMHost::EVMHost(langutil::EVMVersion _evmVersion, evmc::VM& _vm):
 	else
 		assertThrow(false, Exception, "Unsupported EVM version");
 
-	tx_context.block_difficulty = evmc::uint256be{200000000};
+	tx_context.block_prev_randao = evmc::uint256be{200000000}; // TODO: should make it >2**64 for >Paris
 	tx_context.block_gas_limit = 20000000;
 	tx_context.block_coinbase = 0x7878787878787878787878787878787878787878_address;
 	tx_context.tx_gas_price = evmc::uint256be{3000000000};
@@ -145,7 +145,6 @@ EVMHost::EVMHost(langutil::EVMVersion _evmVersion, evmc::VM& _vm):
 void EVMHost::reset()
 {
 	accounts.clear();
-	m_currentAddress = {};
 	// Clear self destruct records
 	recorded_selfdestructs.clear();
 	// Clear call records
@@ -191,14 +190,14 @@ void EVMHost::transfer(evmc::MockedAccount& _sender, evmc::MockedAccount& _recip
 	_recipient.balance = convertToEVMC(u256(convertFromEVMC(_recipient.balance)) + _value);
 }
 
-void EVMHost::selfdestruct(const evmc::address& _addr, const evmc::address& _beneficiary) noexcept
+bool EVMHost::selfdestruct(const evmc::address& _addr, const evmc::address& _beneficiary) noexcept
 {
 	// TODO actual selfdestruct is even more complicated.
 
 	transfer(accounts[_addr], accounts[_beneficiary], convertFromEVMC(accounts[_addr].balance));
 
 	// Record self destructs. Clearing will be done in newTransactionFrame().
-	MockedHost::selfdestruct(_addr, _beneficiary);
+	return MockedHost::selfdestruct(_addr, _beneficiary);
 }
 
 void EVMHost::recordCalls(evmc_message const& _message) noexcept
@@ -209,24 +208,24 @@ void EVMHost::recordCalls(evmc_message const& _message) noexcept
 
 // NOTE: this is used for both internal and external calls.
 // External calls are triggered from ExecutionFramework and contain only EVMC_CREATE or EVMC_CALL.
-evmc::result EVMHost::call(evmc_message const& _message) noexcept
+evmc::Result EVMHost::call(evmc_message const& _message) noexcept
 {
 	recordCalls(_message);
-	if (_message.destination == 0x0000000000000000000000000000000000000001_address)
+	if (_message.recipient == 0x0000000000000000000000000000000000000001_address)
 		return precompileECRecover(_message);
-	else if (_message.destination == 0x0000000000000000000000000000000000000002_address)
+	else if (_message.recipient == 0x0000000000000000000000000000000000000002_address)
 		return precompileSha256(_message);
-	else if (_message.destination == 0x0000000000000000000000000000000000000003_address)
+	else if (_message.recipient == 0x0000000000000000000000000000000000000003_address)
 		return precompileRipeMD160(_message);
-	else if (_message.destination == 0x0000000000000000000000000000000000000004_address)
+	else if (_message.recipient == 0x0000000000000000000000000000000000000004_address)
 		return precompileIdentity(_message);
-	else if (_message.destination == 0x0000000000000000000000000000000000000005_address && m_evmVersion >= langutil::EVMVersion::byzantium())
+	else if (_message.recipient == 0x0000000000000000000000000000000000000005_address && m_evmVersion >= langutil::EVMVersion::byzantium())
 		return precompileModExp(_message);
-	else if (_message.destination == 0x0000000000000000000000000000000000000006_address && m_evmVersion >= langutil::EVMVersion::byzantium())
+	else if (_message.recipient == 0x0000000000000000000000000000000000000006_address && m_evmVersion >= langutil::EVMVersion::byzantium())
 		return precompileALTBN128G1Add(_message);
-	else if (_message.destination == 0x0000000000000000000000000000000000000007_address && m_evmVersion >= langutil::EVMVersion::byzantium())
+	else if (_message.recipient == 0x0000000000000000000000000000000000000007_address && m_evmVersion >= langutil::EVMVersion::byzantium())
 		return precompileALTBN128G1Mul(_message);
-	else if (_message.destination == 0x0000000000000000000000000000000000000008_address && m_evmVersion >= langutil::EVMVersion::byzantium())
+	else if (_message.recipient == 0x0000000000000000000000000000000000000008_address && m_evmVersion >= langutil::EVMVersion::byzantium())
 		return precompileALTBN128PairingProduct(_message);
 
 	auto const stateBackup = accounts;
@@ -244,7 +243,7 @@ evmc::result EVMHost::call(evmc_message const& _message) noexcept
 			message.gas -= message.input_data[i] == 0 ? evmasm::GasCosts::txDataZeroGas : evmasm::GasCosts::txDataNonZeroGas(m_evmVersion);
 		if (message.gas < 0)
 		{
-			evmc::result result({});
+			evmc::Result result;
 			result.status_code = EVMC_OUT_OF_GAS;
 			accounts = stateBackup;
 			return result;
@@ -281,8 +280,8 @@ evmc::result EVMHost::call(evmc_message const& _message) noexcept
 			encodedNonce
 		), h160::AlignRight);
 
-		message.destination = convertToEVMC(createAddress);
-		assertThrow(accounts.count(message.destination) == 0, Exception, "Account cannot exist");
+		message.recipient = convertToEVMC(createAddress);
+		assertThrow(accounts.count(message.recipient) == 0, Exception, "Account cannot exist");
 
 		code = evmc::bytes(message.input_data, message.input_data + message.input_size);
 	}
@@ -295,13 +294,13 @@ evmc::result EVMHost::call(evmc_message const& _message) noexcept
 			keccak256(bytes(message.input_data, message.input_data + message.input_size)).asBytes()
 		), h160::AlignRight);
 
-		message.destination = convertToEVMC(createAddress);
-		if (accounts.count(message.destination) && (
-			accounts[message.destination].nonce > 0 ||
-			!accounts[message.destination].code.empty()
+		message.recipient = convertToEVMC(createAddress);
+		if (accounts.count(message.recipient) && (
+			accounts[message.recipient].nonce > 0 ||
+			!accounts[message.recipient].code.empty()
 		))
 		{
-			evmc::result result({});
+			evmc::Result result;
 			result.status_code = EVMC_OUT_OF_GAS;
 			accounts = stateBackup;
 			return result;
@@ -309,21 +308,18 @@ evmc::result EVMHost::call(evmc_message const& _message) noexcept
 
 		code = evmc::bytes(message.input_data, message.input_data + message.input_size);
 	}
-	else if (message.kind == EVMC_DELEGATECALL || message.kind == EVMC_CALLCODE)
-	{
-		code = accounts[message.destination].code;
-		message.destination = m_currentAddress;
-	}
 	else
-		code = accounts[message.destination].code;
+	{
+		code = accounts[message.code_address].code;
+	}
 
-	auto& destination = accounts[message.destination];
+	auto& destination = accounts[message.recipient];
 
 	if (value != 0 && message.kind != EVMC_DELEGATECALL && message.kind != EVMC_CALLCODE)
 	{
 		if (value > convertFromEVMC(sender.balance))
 		{
-			evmc::result result({});
+			evmc::Result result;
 			result.status_code = EVMC_INSUFFICIENT_BALANCE;
 			accounts = stateBackup;
 			return result;
@@ -337,12 +333,9 @@ evmc::result EVMHost::call(evmc_message const& _message) noexcept
 	if (m_evmRevision >= EVMC_BERLIN)
 	{
 		access_account(message.sender);
-		access_account(message.destination);
+		access_account(message.recipient);
 	}
-	evmc::address currentAddress = m_currentAddress;
-	m_currentAddress = message.destination;
-	evmc::result result = m_vm.execute(*this, m_evmRevision, message, code.data(), code.size());
-	m_currentAddress = currentAddress;
+	evmc::Result result = m_vm.execute(*this, m_evmRevision, message, code.data(), code.size());
 
 	if (message.kind == EVMC_CREATE || message.kind == EVMC_CREATE2)
 	{
@@ -355,7 +348,7 @@ evmc::result EVMHost::call(evmc_message const& _message) noexcept
 		}
 		else
 		{
-			result.create_address = message.destination;
+			result.create_address = message.recipient;
 			destination.code = evmc::bytes(result.output_data, result.output_data + result.output_size);
 			destination.codehash = convertToEVMC(keccak256({result.output_data, result.output_size}));
 		}
@@ -398,7 +391,7 @@ evmc::bytes32 EVMHost::convertToEVMC(h256 const& _data)
 	return d;
 }
 
-evmc::result EVMHost::precompileECRecover(evmc_message const& _message) noexcept
+evmc::Result EVMHost::precompileECRecover(evmc_message const& _message) noexcept
 {
 	// NOTE this is a partial implementation for some inputs.
 	static map<bytes, bytes> const inputOutput{
@@ -421,7 +414,7 @@ evmc::result EVMHost::precompileECRecover(evmc_message const& _message) noexcept
 			fromHex("0000000000000000000000008743523d96a1b2cbe0c6909653a56da18ed484af")
 		}
 	};
-	evmc::result result = precompileGeneric(_message, inputOutput);
+	evmc::Result result = precompileGeneric(_message, inputOutput);
 	// ECRecover will return success with empty response in case of failure
 	if (result.status_code != EVMC_SUCCESS)
 	{
@@ -433,7 +426,7 @@ evmc::result EVMHost::precompileECRecover(evmc_message const& _message) noexcept
 	return result;
 }
 
-evmc::result EVMHost::precompileSha256(evmc_message const& _message) noexcept
+evmc::Result EVMHost::precompileSha256(evmc_message const& _message) noexcept
 {
 	// static data so that we do not need a release routine...
 	bytes static hash;
@@ -445,7 +438,7 @@ evmc::result EVMHost::precompileSha256(evmc_message const& _message) noexcept
 	return resultWithGas(_message, hash);
 }
 
-evmc::result EVMHost::precompileRipeMD160(evmc_message const& _message) noexcept
+evmc::Result EVMHost::precompileRipeMD160(evmc_message const& _message) noexcept
 {
 	// NOTE this is a partial implementation for some inputs.
 	static map<bytes, bytes> const inputOutput{
@@ -511,7 +504,7 @@ evmc::result EVMHost::precompileRipeMD160(evmc_message const& _message) noexcept
 	return precompileGeneric(_message, inputOutput);
 }
 
-evmc::result EVMHost::precompileIdentity(evmc_message const& _message) noexcept
+evmc::Result EVMHost::precompileIdentity(evmc_message const& _message) noexcept
 {
 	// static data so that we do not need a release routine...
 	bytes static data;
@@ -520,13 +513,13 @@ evmc::result EVMHost::precompileIdentity(evmc_message const& _message) noexcept
 	return resultWithGas(_message, data);
 }
 
-evmc::result EVMHost::precompileModExp(evmc_message const&) noexcept
+evmc::Result EVMHost::precompileModExp(evmc_message const&) noexcept
 {
 	// TODO implement
 	return resultWithFailure();
 }
 
-evmc::result EVMHost::precompileALTBN128G1Add(evmc_message const& _message) noexcept
+evmc::Result EVMHost::precompileALTBN128G1Add(evmc_message const& _message) noexcept
 {
 	// NOTE this is a partial implementation for some inputs.
 
@@ -745,7 +738,7 @@ evmc::result EVMHost::precompileALTBN128G1Add(evmc_message const& _message) noex
 	return precompileGeneric(_message, inputOutput);
 }
 
-evmc::result EVMHost::precompileALTBN128G1Mul(evmc_message const& _message) noexcept
+evmc::Result EVMHost::precompileALTBN128G1Mul(evmc_message const& _message) noexcept
 {
 	// NOTE this is a partial implementation for some inputs.
 	static map<bytes, bytes> const inputOutput{
@@ -797,7 +790,7 @@ evmc::result EVMHost::precompileALTBN128G1Mul(evmc_message const& _message) noex
 	return precompileGeneric(_message, inputOutput);
 }
 
-evmc::result EVMHost::precompileALTBN128PairingProduct(evmc_message const& _message) noexcept
+evmc::Result EVMHost::precompileALTBN128PairingProduct(evmc_message const& _message) noexcept
 {
 	// NOTE this is a partial implementation for some inputs.
 	static map<bytes, bytes> const inputOutput{
@@ -936,7 +929,7 @@ evmc::result EVMHost::precompileALTBN128PairingProduct(evmc_message const& _mess
 	return precompileGeneric(_message, inputOutput);
 }
 
-evmc::result EVMHost::precompileGeneric(
+evmc::Result EVMHost::precompileGeneric(
 	evmc_message const& _message,
 	map<bytes, bytes> const& _inOut) noexcept
 {
@@ -947,19 +940,19 @@ evmc::result EVMHost::precompileGeneric(
 		return resultWithFailure();
 }
 
-evmc::result EVMHost::resultWithFailure() noexcept
+evmc::Result EVMHost::resultWithFailure() noexcept
 {
-	evmc::result result({});
+	evmc::Result result;
 	result.status_code = EVMC_FAILURE;
 	return result;
 }
 
-evmc::result EVMHost::resultWithGas(
+evmc::Result EVMHost::resultWithGas(
 	evmc_message const& _message,
 	bytes const& _data
 ) noexcept
 {
-	evmc::result result({});
+	evmc::Result result;
 	result.status_code = EVMC_SUCCESS;
 	result.gas_left = _message.gas;
 	result.output_data = _data.data();
@@ -995,7 +988,7 @@ void EVMHostPrinter::storage()
 			m_stateStream << "  "
 				<< m_host.convertFromEVMC(slot)
 				<< ": "
-				<< m_host.convertFromEVMC(value.value)
+				<< m_host.convertFromEVMC(value.current)
 				<< endl;
 }
 
@@ -1009,10 +1002,11 @@ void EVMHostPrinter::balance()
 void EVMHostPrinter::selfdestructRecords()
 {
 	for (auto const& record: m_host.recorded_selfdestructs)
-		m_stateStream << "SELFDESTRUCT"
-			<< " BENEFICIARY "
-			<< m_host.convertFromEVMC(record.beneficiary)
-			<< endl;
+		for (auto const& beneficiary: record.second)
+			m_stateStream << "SELFDESTRUCT"
+				<< " BENEFICIARY "
+				<< m_host.convertFromEVMC(beneficiary)
+				<< endl;
 }
 
 void EVMHostPrinter::callRecords()
