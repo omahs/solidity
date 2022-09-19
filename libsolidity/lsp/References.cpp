@@ -29,6 +29,15 @@ using namespace solidity::frontend;
 namespace solidity::lsp
 {
 
+void References::initialize(Json::Value const& _clientCapabilities, Json::Value& _replyCapabilities)
+{
+	if (_clientCapabilities["textDocument"]["references"])
+	{
+		_replyCapabilities["referencesProvider"] = true;
+		m_server.registerHandler("textDocument/references", *this);
+	}
+}
+
 void References::operator()(MessageID _id, Json::Value const& _args)
 {
 	auto const [sourceUnitName, lineColumn] = extractSourceUnitNameAndLineColumn(_args);

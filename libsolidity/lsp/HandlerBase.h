@@ -18,10 +18,11 @@
 #pragma once
 
 #include <libsolidity/lsp/FileRepository.h>
-#include <libsolidity/lsp/LanguageServer.h>
 
 #include <liblangutil/SourceLocation.h>
 #include <liblangutil/CharStreamProvider.h>
+
+#include <libsolutil/JSON.h>
 
 #include <optional>
 
@@ -29,6 +30,7 @@ namespace solidity::lsp
 {
 
 class Transport;
+class LanguageServer;
 
 /**
  * Helper base class for implementing handlers.
@@ -37,6 +39,9 @@ class HandlerBase
 {
 public:
 	explicit HandlerBase(LanguageServer& _server): m_server{_server} {}
+	virtual ~HandlerBase() = default;
+
+	virtual void initialize(Json::Value const& /*_clientCapabilities*/, Json::Value& /*_replyCapabilities*/) {}
 
 	Json::Value toRange(langutil::SourceLocation const& _location) const;
 	Json::Value toJson(langutil::SourceLocation const& _location) const;
@@ -45,9 +50,9 @@ public:
 	/// from the JSON-RPC parameters.
 	std::pair<std::string, langutil::LineColumn> extractSourceUnitNameAndLineColumn(Json::Value const& _params) const;
 
-	langutil::CharStreamProvider const& charStreamProvider() const noexcept { return m_server.compilerStack(); }
-	FileRepository& fileRepository() const noexcept { return m_server.fileRepository(); }
-	Transport& client() const noexcept { return m_server.client(); }
+	langutil::CharStreamProvider const& charStreamProvider() const noexcept;
+	FileRepository& fileRepository() const noexcept;
+	Transport& client() const noexcept;
 
 protected:
 	LanguageServer& m_server;

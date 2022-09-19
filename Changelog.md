@@ -6,6 +6,7 @@ Language Features:
 Compiler Features:
 * Yul Optimizer: Allow replacing the previously hard-coded cleanup sequence by specifying custom steps after a colon delimiter (``:``) in the sequence string.
 * Language Server: Implements finding all references as well as semantic highlighting of symbols.
+* Language Server: Constrain server feature set based on advertised client capabilities.
 
 
 Bugfixes:

@@ -16,12 +16,22 @@
 */
 // SPDX-License-Identifier: GPL-3.0
 #include <libsolidity/lsp/SemanticHighlight.h>
+#include <libsolidity/lsp/LanguageServer.h>
 #include <libsolidity/lsp/Utils.h>
 
 using namespace std;
 using namespace solidity;
 using namespace solidity::lsp;
 using namespace solidity::frontend;
+
+void SemanticHighlight::initialize(Json::Value const& _clientCapabilities, Json::Value& _replyCapabilities)
+{
+	if (_clientCapabilities["textDocument"]["documentHighlight"])
+	{
+		_replyCapabilities["documentHighlightProvider"] = true;
+		m_server.registerHandler("textDocument/documentHighlight", *this);
+	}
+}
 
 void SemanticHighlight::operator()(MessageID _id, Json::Value const& _args)
 {

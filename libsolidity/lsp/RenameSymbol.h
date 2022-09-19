@@ -16,6 +16,7 @@
 */
 // SPDX-License-Identifier: GPL-3.0
 #include <libsolidity/lsp/HandlerBase.h>
+#include <libsolidity/lsp/Transport.h>
 #include <libsolidity/ast/AST.h>
 #include <libsolidity/ast/ASTVisitor.h>
 
@@ -26,6 +27,8 @@ class RenameSymbol: public HandlerBase
 {
 public:
 	explicit RenameSymbol(LanguageServer& _server): HandlerBase(_server) {}
+
+	void initialize(Json::Value const& _clientCapabilities, Json::Value& _replyCapabilities) override;
 
 	void operator()(MessageID, Json::Value const&);
 protected:
