@@ -44,7 +44,7 @@ WORKSPACE=/root/project
 
 cd $WORKSPACE
 
-# NOTE: workaround to git unsafe repository error by adding /root/project as a safe.directory
+# NOTE: Without `safe.directory` git would assume it's not safe to operate on /root/project since it's owned by a different user.
 # See https://github.blog/2022-04-12-git-security-vulnerability-announced/
 git config --global --add safe.directory $WORKSPACE
 
