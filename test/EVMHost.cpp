@@ -960,8 +960,7 @@ evmc::result EVMHost::resultWithFailure() noexcept
 
 evmc::result EVMHost::precompileValidateGasUsage(evmc::result result, int64_t gas_limit, int64_t gas_required) noexcept
 {
-	// We assume result.gas_left is set to the input message.gas
-	if (result.gas_left < gas_required)
+	if (gas_limit < gas_required)
 	{
 		result.status_code = EVMC_OUT_OF_GAS;
 		result.gas_left = 0;
