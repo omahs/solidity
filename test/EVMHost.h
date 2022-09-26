@@ -112,13 +112,11 @@ private:
 	static evmc::result precompileALTBN128G1Add(evmc_message const& _message) noexcept;
 	static evmc::result precompileALTBN128G1Mul(evmc_message const& _message) noexcept;
 	static evmc::result precompileALTBN128PairingProduct(evmc_message const& _message) noexcept;
-	static evmc::result precompileGeneric(evmc_message const& _message, std::map<bytes, bytes> const& _inOut) noexcept;
-	/// Take in a result and the required gas. It assumes result.gas_left is set to the starting gas.
-	/// @returns the result object with gas deducted, or a failure object.
-	static evmc::result precompileValidateGasUsage(evmc::result result, int64_t gas_limit, int64_t gas_required) noexcept;
-	/// @returns a result object with no gas usage and result data taken from @a _data.
+	static evmc::result precompileGeneric(evmc_message const& _message, int64_t gas_required, std::map<bytes, bytes> const& _inOut) noexcept;
+	/// @returns a result object with nas usage and result data taken from @a _data.
+	/// The outcome will be a failure if the limit < required.
 	/// @note The return value is only valid as long as @a _data is alive!
-	static evmc::result resultWithGas(evmc_message const& _message, bytes const& _data) noexcept;
+	static evmc::result resultWithGas(int64_t gas_limit, int64_t gas_required, bytes const& _data) noexcept;
 	static evmc::result resultWithFailure() noexcept;
 
 	evmc::VM& m_vm;

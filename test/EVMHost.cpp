@@ -418,9 +418,17 @@ evmc::result EVMHost::precompileECRecover(evmc_message const& _message) noexcept
 			fromHex("0000000000000000000000008743523d96a1b2cbe0c6909653a56da18ed484af")
 		}
 	};
-	evmc::result result = precompileGeneric(_message, inputOutput);
-	result.status_code = EVMC_SUCCESS;
-	return precompileValidateGasUsage(std::move(result), _message.gas, evmasm::GasCosts::precompileEcrecoverGas);
+	evmc::result result = precompileGeneric(_message, evmasm::GasCosts::precompileEcrecoverGas, inputOutput);
+	// ECRecover will return success with empty response in case of failure
+	if (result.status_code != EVMC_SUCCESS && result.status_code != EVMC_OUT_OF_GAS)
+	{
+		return resultWithGas(_message.gas, evmasm::GasCosts::precompileEcrecoverGas, {});
+//		result.status_code = EVMC_SUCCESS;
+//		result.gas_left = _message.gas;
+//		result.output_data = {};
+//		result.output_size = 0;
+	}
+	return result;
 }
 
 evmc::result EVMHost::precompileSha256(evmc_message const& _message) noexcept
@@ -435,11 +443,7 @@ evmc::result EVMHost::precompileSha256(evmc_message const& _message) noexcept
 	int64_t gas_cost = evmasm::GasCosts::precompileSha256BaseGas;
 	gas_cost += ((_message.input_size + 31) / 32) * int64_t{evmasm::GasCosts::precompileSha256PerWordGas};
 
-	evmc::result result({});
-	result.status_code = EVMC_SUCCESS;
-	result.output_data = hash.data();
-	result.output_size = hash.size();
-	return precompileValidateGasUsage(std::move(result), _message.gas, gas_cost);
+	return resultWithGas(_message.gas, gas_cost, hash);
 }
 
 evmc::result EVMHost::precompileRipeMD160(evmc_message const& _message) noexcept
@@ -505,7 +509,8 @@ evmc::result EVMHost::precompileRipeMD160(evmc_message const& _message) noexcept
 			fromHex("000000000000000000000000ac5ab22e07b0fb80c69b6207902f725e2507e546")
 		}
 	};
-	return precompileGeneric(_message, inputOutput);
+	// TODO: consume gas
+	return precompileGeneric(_message, 0, inputOutput);
 }
 
 evmc::result EVMHost::precompileIdentity(evmc_message const& _message) noexcept
@@ -517,11 +522,7 @@ evmc::result EVMHost::precompileIdentity(evmc_message const& _message) noexcept
 	int64_t gas_cost = evmasm::GasCosts::precompileIdentityBaseGas;
 	gas_cost += ((_message.input_size + 31) / 32) * int64_t{evmasm::GasCosts::precompileIdentityPerWordGas};
 
-	evmc::result result({});
-	result.status_code = EVMC_SUCCESS;
-	result.output_data = data.data();
-	result.output_size = data.size();
-	return precompileValidateGasUsage(std::move(result), _message.gas, gas_cost);
+	return resultWithGas(_message.gas, gas_cost, data);
 }
 
 evmc::result EVMHost::precompileModExp(evmc_message const&) noexcept
@@ -746,7 +747,8 @@ evmc::result EVMHost::precompileALTBN128G1Add(evmc_message const& _message) noex
 			)
 		}
 	};
-	return precompileGeneric(_message, inputOutput);
+	// TODO: consume gas
+	return precompileGeneric(_message, 0, inputOutput);
 }
 
 evmc::result EVMHost::precompileALTBN128G1Mul(evmc_message const& _message) noexcept
@@ -798,7 +800,8 @@ evmc::result EVMHost::precompileALTBN128G1Mul(evmc_message const& _message) noex
 			fromHex("2174f0221490cd9c15b0387f3251ec3d49517a51c37a8076eac12afb4a95a7071d1c3fcd3161e2a417b4df0955f02db1fffa9005210fb30c5aa3755307e9d1f5")
 		}
 	};
-	return precompileGeneric(_message, inputOutput);
+	// TODO: consume gas
+	return precompileGeneric(_message, 0, inputOutput);
 }
 
 evmc::result EVMHost::precompileALTBN128PairingProduct(evmc_message const& _message) noexcept
@@ -937,16 +940,18 @@ evmc::result EVMHost::precompileALTBN128PairingProduct(evmc_message const& _mess
 			fromHex("0000000000000000000000000000000000000000000000000000000000000001")
 		}
 	};
-	return precompileGeneric(_message, inputOutput);
+	// TODO consume gas
+	return precompileGeneric(_message, 0, inputOutput);
 }
 
 evmc::result EVMHost::precompileGeneric(
 	evmc_message const& _message,
+	int64_t gas_required,
 	map<bytes, bytes> const& _inOut) noexcept
 {
 	bytes input(_message.input_data, _message.input_data + _message.input_size);
 	if (_inOut.count(input))
-		return resultWithGas(_message, _inOut.at(input));
+		return resultWithGas(_message.gas, gas_required, _inOut.at(input));
 	else
 		return resultWithFailure();
 }
@@ -958,26 +963,23 @@ evmc::result EVMHost::resultWithFailure() noexcept
 	return result;
 }
 
-evmc::result EVMHost::precompileValidateGasUsage(evmc::result result, int64_t gas_limit, int64_t gas_required) noexcept
+evmc::result EVMHost::resultWithGas(
+	int64_t gas_limit,
+	int64_t gas_required,
+	bytes const& _data
+) noexcept
 {
+	evmc::result result({});
 	if (gas_limit < gas_required)
 	{
 		result.status_code = EVMC_OUT_OF_GAS;
 		result.gas_left = 0;
 	}
 	else
+	{
+		result.status_code = EVMC_SUCCESS;
 		result.gas_left = gas_limit - gas_required;
-	return result;
-}
-
-evmc::result EVMHost::resultWithGas(
-	evmc_message const& _message,
-	bytes const& _data
-) noexcept
-{
-	evmc::result result({});
-	result.status_code = EVMC_SUCCESS;
-	result.gas_left = _message.gas;
+	}
 	result.output_data = _data.data();
 	result.output_size = _data.size();
 	return result;
