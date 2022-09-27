@@ -930,7 +930,7 @@ evmc::result EVMHost::precompileALTBN128PairingProduct(evmc_message const& _mess
 	int64_t gas_cost = (45000 + 34000 * (_message.input_size / 192));
 
 	// NOTE this is a partial implementation for some inputs.
-	static map<bytes, tuple<bytes, in64_t>> const inputOutput{
+	static map<bytes, tuple<bytes, int64_t>> const inputOutput{
 		{
 			fromHex(
 				"17c139df0efee0f766bc0204762b774362e4ded88953a39ce849a8a7fa163fa9"
