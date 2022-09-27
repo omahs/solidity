@@ -109,9 +109,9 @@ private:
 	static evmc::result precompileRipeMD160(evmc_message const& _message) noexcept;
 	static evmc::result precompileIdentity(evmc_message const& _message) noexcept;
 	static evmc::result precompileModExp(evmc_message const& _message) noexcept;
-	static evmc::result precompileALTBN128G1Add(evmc_message const& _message) noexcept;
-	static evmc::result precompileALTBN128G1Mul(evmc_message const& _message) noexcept;
-	static evmc::result precompileALTBN128PairingProduct(evmc_message const& _message) noexcept;
+	static evmc::result precompileALTBN128G1Add(evmc_message const& _message, evmc_revision _revision) noexcept;
+	static evmc::result precompileALTBN128G1Mul(evmc_message const& _message, evmc_revision _revision) noexcept;
+	static evmc::result precompileALTBN128PairingProduct(evmc_message const& _message, evmc_revision _revision) noexcept;
 	static evmc::result precompileGeneric(evmc_message const& _message, std::map<bytes, std::tuple<bytes, int64_t>> const& _inOut) noexcept;
 	/// @returns a result object with nas usage and result data taken from @a _data.
 	/// The outcome will be a failure if the limit < required.

@@ -220,11 +220,11 @@ evmc::result EVMHost::call(evmc_message const& _message) noexcept
 	else if (_message.destination == 0x0000000000000000000000000000000000000005_address && m_evmVersion >= langutil::EVMVersion::byzantium())
 		return precompileModExp(_message);
 	else if (_message.destination == 0x0000000000000000000000000000000000000006_address && m_evmVersion >= langutil::EVMVersion::byzantium())
-		return precompileALTBN128G1Add(_message);
+		return precompileALTBN128G1Add(_message, m_evmRevision);
 	else if (_message.destination == 0x0000000000000000000000000000000000000007_address && m_evmVersion >= langutil::EVMVersion::byzantium())
-		return precompileALTBN128G1Mul(_message);
+		return precompileALTBN128G1Mul(_message, m_evmRevision);
 	else if (_message.destination == 0x0000000000000000000000000000000000000008_address && m_evmVersion >= langutil::EVMVersion::byzantium())
-		return precompileALTBN128PairingProduct(_message);
+		return precompileALTBN128PairingProduct(_message, m_evmRevision);
 
 	auto const stateBackup = accounts;
 
@@ -566,12 +566,11 @@ evmc::result EVMHost::precompileModExp(evmc_message const&) noexcept
 	return resultWithFailure();
 }
 
-evmc::result EVMHost::precompileALTBN128G1Add(evmc_message const& _message) noexcept
+evmc::result EVMHost::precompileALTBN128G1Add(evmc_message const& _message, evmc_revision _revision) noexcept
 {
 	// NOTE this is a partial implementation for some inputs.
 
-//	int64_t gas_cost = (m_evmRevision < EVMC_ISTANBUL) ? 500 : 150;
-	int64_t gas_cost = 150;
+	int64_t gas_cost = (_revision < EVMC_ISTANBUL) ? 500 : 150;
 
 	static map<bytes, tuple<bytes, int64_t>> const inputOutput{
 		{
@@ -833,12 +832,11 @@ evmc::result EVMHost::precompileALTBN128G1Add(evmc_message const& _message) noex
 	return precompileGeneric(_message, inputOutput);
 }
 
-evmc::result EVMHost::precompileALTBN128G1Mul(evmc_message const& _message) noexcept
+evmc::result EVMHost::precompileALTBN128G1Mul(evmc_message const& _message, evmc_revision _revision) noexcept
 {
 	// NOTE this is a partial implementation for some inputs.
 
-//	int64_t gas_cost = (m_evmRevision < EVMC_ISTANBUL) ? 40000 : 6000;
-	int64_t gas_cost = 6000;
+	int64_t gas_cost = (_revision < EVMC_ISTANBUL) ? 40000 : 6000;
 
 	static map<bytes, tuple<bytes, int64_t>> const inputOutput{
 		{
@@ -922,12 +920,11 @@ evmc::result EVMHost::precompileALTBN128G1Mul(evmc_message const& _message) noex
 	return precompileGeneric(_message, inputOutput);
 }
 
-evmc::result EVMHost::precompileALTBN128PairingProduct(evmc_message const& _message) noexcept
+evmc::result EVMHost::precompileALTBN128PairingProduct(evmc_message const& _message, evmc_revision _revision) noexcept
 {
-//	int64_t gas_cost = (m_evmRevision < EVMC_ISTANBUL) ?
-//		(100000 + 80000 * (_message.input_size / 192)) :
-//		(45000 + 34000 * (_message.input_size / 192));
-	int64_t gas_cost = (45000 + 34000 * (_message.input_size / 192));
+	int64_t gas_cost = (_revision < EVMC_ISTANBUL) ?
+		(100000 + 80000 * (_message.input_size / 192)) :
+		(45000 + 34000 * (_message.input_size / 192));
 
 	// NOTE this is a partial implementation for some inputs.
 	static map<bytes, tuple<bytes, int64_t>> const inputOutput{
