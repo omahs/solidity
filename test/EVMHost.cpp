@@ -430,7 +430,13 @@ evmc::result EVMHost::precompileECRecover(evmc_message const& _message) noexcept
 	evmc::result result = precompileGeneric(_message, inputOutput);
 	// ECRecover will return success with empty response in case of failure
 	if (result.status_code != EVMC_SUCCESS && result.status_code != EVMC_OUT_OF_GAS)
-		return resultWithGas(_message.gas, gas_cost, {});
+//		return resultWithGas(_message.gas, gas_cost, {});
+	{
+		result.status_code = EVMC_SUCCESS;
+		result.gas_left = _message.gas - gas_cost;
+		result.output_data = {};
+		result.output_size = 0;
+	}
 	return result;
 }
 
