@@ -26,18 +26,18 @@ set -e
 # changes directory. The paths returned by `caller` are relative to it.
 _initial_work_dir=$(pwd)
 
-if [ "$CIRCLECI" ]
+if [[ -n ${CIRCLECI:-} ]]
 then
     export TERM="${TERM:-xterm}"
-    function printTask { echo "$(tput bold)$(tput setaf 2)$1$(tput setaf 7)"; }
-    function printError { >&2 echo "$(tput setaf 1)$1$(tput setaf 7)"; }
-    function printWarning { >&2 echo "$(tput setaf 11)$1$(tput setaf 7)"; }
-    function printLog { echo "$(tput setaf 3)$1$(tput setaf 7)"; }
+    function printTask { echo -e "$(tput bold)$(tput setaf 2)$1$(tput setaf 7)"; }
+    function printError { >&2 echo -e "$(tput setaf 1)$1$(tput setaf 7)"; }
+    function printWarning { >&2 echo -e "$(tput setaf 11)$1$(tput setaf 7)"; }
+    function printLog { echo -e "$(tput setaf 3)$1$(tput setaf 7)"; }
 else
-    function printTask { echo "$(tput bold)$(tput setaf 2)$1$(tput sgr0)"; }
-    function printError { >&2 echo "$(tput setaf 1)$1$(tput sgr0)"; }
-    function printWarning { >&2 echo "$(tput setaf 11)$1$(tput sgr0)"; }
-    function printLog { echo "$(tput setaf 3)$1$(tput sgr0)"; }
+    function printTask { echo -e "$(tput bold)$(tput setaf 2)$1$(tput sgr0)"; }
+    function printError { >&2 echo -e "$(tput setaf 1)$1$(tput sgr0)"; }
+    function printWarning { >&2 echo -e "$(tput setaf 11)$1$(tput sgr0)"; }
+    function printLog { echo -e "$(tput setaf 3)$1$(tput sgr0)"; }
 fi
 
 function checkDputEntries
@@ -193,16 +193,43 @@ function msg_on_error
     fi
 }
 
+
 function diff_values
 {
     (( $# >= 2 )) || fail "diff_values requires at least 2 arguments."
 
     local value1="$1"
     local value2="$2"
-    shift
-    shift
+    shift 2
 
-    diff --unified=0 <(echo "$value1") <(echo "$value2") "$@"
+    if ! diff --unified=0 <(echo "$value1") <(echo "$value2") "$@"
+    then
+        if [[ -z ${DIFFVIEW:-} ]]
+        then
+            # Use user supplied diff view binary
+            "$DIFFVIEW" "${value1}" "${value2}"
+        fi
+        return 1
+    fi
+}
+
+function diff_files
+{
+    (( $# >= 2 )) || fail "diff_files requires at least 2 arguments."
+
+    local file1="$1"
+    local file2="$2"
+
+    if ! diff "${file1}" "${file2}"
+    then
+        if [[ -n ${DIFFVIEW:-} ]]
+        then
+            # Use user supplied diff view binary
+            "$DIFFVIEW" "${file1}" "${file2}"
+        fi
+        return 1
+    fi
+    return 0
 }
 
 function safe_kill
@@ -276,4 +303,14 @@ function split_on_empty_lines_into_numbered_files
     path_suffix="${2}"
 
     awk -v RS= "{print > (\"${path_prefix}_\"NR \"${path_suffix}\")}"
+}
+
+function command_available
+{
+    local program="$1"
+    local parameters=${*:2}
+    if ! "${program}" "${parameters}" > /dev/null 2>&1
+    then
+        fail "'${program}' not found or not executed successfully with parameter(s) '${parameters}'. aborting."
+    fi
 }
