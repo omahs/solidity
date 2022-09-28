@@ -97,7 +97,7 @@ private:
 	void transfer(evmc::MockedAccount& _sender, evmc::MockedAccount& _recipient, u256 const& _value) noexcept;
 
 	/// Start a new transaction frame.
-	/// This will perform selfdestructs and clear account/storage access indicator for EIP-2929.
+	/// This will perform selfdestructs, and apply storage status changes across all accounts.
 	void newTransactionFrame();
 
 	/// Records calls made via @param _message.

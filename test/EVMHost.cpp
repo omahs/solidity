@@ -188,6 +188,14 @@ void EVMHost::newTransactionFrame()
 	recorded_selfdestructs.clear();
 }
 
+// TODO: merge resetWarmAccess
+void EVMHost::newTransactionFrame()
+{
+	for (auto& [address, account]: accounts)
+		for (auto& [slot, value]: account.storage)
+			value.original = value.current;
+}
+
 void EVMHost::transfer(evmc::MockedAccount& _sender, evmc::MockedAccount& _recipient, u256 const& _value) noexcept
 {
 	assertThrow(u256(convertFromEVMC(_sender.balance)) >= _value, Exception, "Insufficient balance for transfer");
