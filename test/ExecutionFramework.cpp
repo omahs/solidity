@@ -165,7 +165,7 @@ void ExecutionFramework::sendMessage(bytes const& _data, bool _isCreation, u256 
 			cout << " value: " << _value << endl;
 		cout << " in:      " << util::toHex(_data) << endl;
 	}
-	evmc_message message = {};
+	evmc_message message{};
 	message.input_data = _data.data();
 	message.input_size = _data.size();
 	message.sender = EVMHost::convertToEVMC(m_sender);
@@ -213,11 +213,12 @@ void ExecutionFramework::sendEther(h160 const& _addr, u256 const& _amount)
 		if (_amount > 0)
 			cout << " value: " << _amount << endl;
 	}
-	evmc_message message = {};
+	evmc_message message{};
 	message.sender = EVMHost::convertToEVMC(m_sender);
 	message.value = EVMHost::convertToEVMC(_amount);
 	message.kind = EVMC_CALL;
 	message.recipient = EVMHost::convertToEVMC(_addr);
+	message.code_address = message.recipient;
 	message.gas = InitialGas.convert_to<int64_t>();
 
 	m_evmcHost->call(message);
