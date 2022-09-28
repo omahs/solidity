@@ -38,6 +38,7 @@
 #include <range/v3/range.hpp>
 #include <range/v3/view/transform.hpp>
 
+#include <algorithm>
 #include <cstdlib>
 #include <limits>
 
@@ -193,13 +194,17 @@ void ExecutionFramework::sendMessage(bytes const& _data, bool _isCreation, u256 
 		m_contractAddress = EVMHost::convertFromEVMC(result.create_address);
 
 	m_gasUsed = InitialGas - result.gas_left;
+	unsigned const refundRatio = (m_evmVersion >= langutil::EVMVersion::london() ? 5 : 2);
+	m_gasUsed -= min(m_gasUsed / refundRatio, u256(result.gas_refund));
 	m_transactionSuccessful = (result.status_code == EVMC_SUCCESS);
 
 	if (m_showMessages)
 	{
 		cout << " out:     " << util::toHex(m_output) << endl;
 		cout << " result: " << static_cast<size_t>(result.status_code) << endl;
-		cout << " gas used: " << m_gasUsed.str() << endl;
+		cout << " gas used: " << (100000000 - result.gas_left) << endl;
+		cout << " gas used (incl refund): " << m_gasUsed.str() << endl;
+		cout << " gas refund: " << result.gas_refund << endl;
 	}
 }
 

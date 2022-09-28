@@ -11,6 +11,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include <iostream>
+
 namespace evmc
 {
 /// The string of bytes.
@@ -311,7 +313,9 @@ public:
         }();
 
         s.current = value;  // Finally update the current storage value.
-        return status;
+        auto const tmp = status;
+        std::cout << "set_storage " << key.bytes << " -> " << value.bytes << " -> " << status << "\n";
+        return tmp;
     }
 
     /// Get the account's balance (EVMC Host method).
