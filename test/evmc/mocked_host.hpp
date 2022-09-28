@@ -13,6 +13,26 @@
 
 #include <iostream>
 
+namespace {
+
+using bytes_view = std::basic_string_view<uint8_t>;
+
+/// Encode a byte to a hex string.
+inline std::string hex(uint8_t b) noexcept
+{
+    static constexpr auto hex_chars = "0123456789abcdef";
+    return {hex_chars[b >> 4], hex_chars[b & 0xf]};
+}
+std::string hex(evmc::bytes32 bs)
+{
+    std::string str;
+    str.reserve(32 * 2);
+    for (const auto b : bs.bytes)
+        str += hex(b);
+    return str;
+}
+}
+
 namespace evmc
 {
 /// The string of bytes.
@@ -184,6 +204,8 @@ public:
         // storage values after the execution terminates.
         auto& s = accounts[addr].storage[key];
 
+	std::cout << "set_storage old=" << hex(s.current) << " new=" << hex(value) << " dirty=" << (s.original != s.current) << "\n";
+
         // Follow the EIP-2200 specification as closely as possible.
         // https://eips.ethereum.org/EIPS/eip-2200
         // Warning: this is not the most efficient implementation. The storage status can be
@@ -314,7 +336,7 @@ public:
 
         s.current = value;  // Finally update the current storage value.
         auto const tmp = status;
-        std::cout << "set_storage " << key.bytes << " -> " << value.bytes << " -> " << status << "\n";
+//        std::cout << "set_storage " << key.bytes << " -> " << value.bytes << " -> " << status << "\n";
         return tmp;
     }
 
