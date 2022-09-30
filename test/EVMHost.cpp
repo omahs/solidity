@@ -183,11 +183,9 @@ void EVMHost::newTransactionFrame()
 		{
 			// Clear EIP-2929 storage access indicator
 			value.access_status = EVMC_ACCESS_COLD;
-		}
-	for (auto& [address, account]: accounts)
-		for (auto& [slot, value]: account.storage)
 			// Mark storage values for proper refund calculation.
 			value.original = value.current;
+		}
 	// Process selfdestruct list
 	for (auto& [address, _]: recorded_selfdestructs)
 		accounts.erase(address);
