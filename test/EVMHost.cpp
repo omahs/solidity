@@ -178,22 +178,20 @@ void EVMHost::newTransactionFrame()
 {
 	// Clear EIP-2929 account access indicator
 	recorded_account_accesses.clear();
-	// Clear EIP-2929 storage access indicator
 	for (auto& [address, account]: accounts)
 		for (auto& [slot, value]: account.storage)
+		{
+			// Clear EIP-2929 storage access indicator
 			value.access_status = EVMC_ACCESS_COLD;
+		}
+	for (auto& [address, account]: accounts)
+		for (auto& [slot, value]: account.storage)
+			// Mark storage values for proper refund calculation.
+			value.original = value.current;
 	// Process selfdestruct list
 	for (auto& [address, _]: recorded_selfdestructs)
 		accounts.erase(address);
 	recorded_selfdestructs.clear();
-}
-
-// TODO: merge resetWarmAccess
-void EVMHost::newTransactionFrame()
-{
-	for (auto& [address, account]: accounts)
-		for (auto& [slot, value]: account.storage)
-			value.original = value.current;
 }
 
 void EVMHost::transfer(evmc::MockedAccount& _sender, evmc::MockedAccount& _recipient, u256 const& _value) noexcept
