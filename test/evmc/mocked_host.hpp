@@ -23,6 +23,7 @@ inline std::string hex(uint8_t b) noexcept
     static constexpr auto hex_chars = "0123456789abcdef";
     return {hex_chars[b >> 4], hex_chars[b & 0xf]};
 }
+/*
 std::string hex(evmc::bytes32 bs)
 {
     std::string str;
@@ -31,6 +32,7 @@ std::string hex(evmc::bytes32 bs)
         str += hex(b);
     return str;
 }
+*/
 }
 
 namespace evmc
