@@ -42,11 +42,11 @@ fi
 
 WORKSPACE=/root/project
 
-cd $WORKSPACE
+cd "$WORKSPACE"
 
 # NOTE: Without `safe.directory` git would assume it's not safe to operate on /root/project since it's owned by a different user.
 # See https://github.blog/2022-04-12-git-security-vulnerability-announced/
-git config --global --add safe.directory $WORKSPACE
+git config --global --add safe.directory "$WORKSPACE"
 
 # shellcheck disable=SC2166
 if [[ "$CIRCLE_BRANCH" = release || -n "$CIRCLE_TAG" || -n "$FORCE_RELEASE" || "$(git tag --points-at HEAD 2>/dev/null)" == v* ]]
