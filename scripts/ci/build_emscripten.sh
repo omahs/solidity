@@ -90,3 +90,6 @@ cp upload/soljson.js ./
 OUTPUT_SIZE=$(ls -la soljson.js)
 
 echo "Emscripten output size: $OUTPUT_SIZE"
+
+# Clean up safe.directory config
+git config --global --unset safe.directory
