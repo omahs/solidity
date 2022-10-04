@@ -128,6 +128,76 @@ Json::Value semanticTokensLegend()
 	return legend;
 }
 
+struct MarkdownBuilder
+{
+	std::stringstream result;
+
+	MarkdownBuilder& code(std::string const& _code)
+	{
+		auto constexpr SolidityLanguageId = "solidity";
+		result << "```" << SolidityLanguageId << '\n' << _code << "\n```\n\n";
+		return *this;
+	}
+
+	MarkdownBuilder& paragraph(std::string const& _text)
+	{
+		if (_text.empty())
+		{
+			result << _text << '\n';
+			if (_text.back() != '\n') // We want double-LF to ensure constructing a paragraph.
+				result << '\n';
+		}
+		return *this;
+	}
+};
+
+string symbolHoverInformation(ASTNode const* _sourceNode)
+{
+	MarkdownBuilder markdown{};
+
+	// Try getting the type definition of the underlying AST node, if available.
+	if (auto const* expression = dynamic_cast<Expression const*>(_sourceNode))
+	{
+		if (expression->annotation().type)
+			markdown.code(expression->annotation().type->toString(false));
+		if (auto const* declaration = ASTNode::referencedDeclaration(*expression))
+			if (declaration->type())
+				markdown.code(declaration->type()->toString(false));
+	}
+	else if (auto const* declaration = dynamic_cast<Declaration const*>(_sourceNode))
+	{
+		if (declaration->type())
+			markdown.code(declaration->type()->toString(false));
+	}
+	else if (auto const* identifierPath = dynamic_cast<IdentifierPath const*>(_sourceNode))
+	{
+		Declaration const* decl = identifierPath->annotation().referencedDeclaration;
+		if (decl && decl->type())
+			markdown.code(decl->type()->toString(false));
+		if (auto const* node = dynamic_cast<StructurallyDocumented const*>(decl))
+			if (node->documentation()->text())
+				markdown.paragraph(*node->documentation()->text());
+	}
+	else if (auto const* expression = dynamic_cast<Expression const*>(_sourceNode))
+	{
+		if (auto const* declaration = ASTNode::referencedDeclaration(*expression))
+			if (declaration->type())
+				markdown.code(declaration->type()->toString(false));
+	}
+	else
+	{
+		markdown.paragraph(fmt::format("Unhandled AST node type in hover: {}\n", typeid(*_sourceNode).name()));
+	}
+
+	// If this AST node contains documentation itself, append it.
+	if (auto const* documented = dynamic_cast<StructurallyDocumented const*>(_sourceNode))
+	{
+		if (documented->documentation())
+			markdown.paragraph(*documented->documentation()->text());
+	}
+
+	return markdown.result.str();
+}
 }
 
 LanguageServer::LanguageServer(Transport& _transport):
@@ -144,6 +214,7 @@ LanguageServer::LanguageServer(Transport& _transport):
 		{"textDocument/didOpen", bind(&LanguageServer::handleTextDocumentDidOpen, this, _2)},
 		{"textDocument/didChange", bind(&LanguageServer::handleTextDocumentDidChange, this, _2)},
 		{"textDocument/didClose", bind(&LanguageServer::handleTextDocumentDidClose, this, _2)},
+		{"textDocument/hover", bind(&LanguageServer::handleTextDocumentHover, this, _1, _2)},
 		{"textDocument/rename", RenameSymbol(*this) },
 		{"textDocument/implementation", GotoDefinition(*this) },
 		{"textDocument/semanticTokens/full", bind(&LanguageServer::semanticTokensFull, this, _1, _2)},
@@ -417,6 +488,7 @@ void LanguageServer::handleInitialize(MessageID _id, Json::Value const& _args)
 	replyArgs["capabilities"]["semanticTokensProvider"]["range"] = false;
 	replyArgs["capabilities"]["semanticTokensProvider"]["full"] = true; // XOR requests.full.delta = true
 	replyArgs["capabilities"]["renameProvider"] = true;
+	replyArgs["capabilities"]["hoverProvider"] = true;
 
 	m_client.reply(_id, std::move(replyArgs));
 }
@@ -555,5 +627,26 @@ ASTNode const* LanguageServer::astNodeAtSourceLocation(std::string const& _sourc
 		return locateInnermostASTNode(*sourcePos, m_compilerStack.ast(_sourceUnitName));
 	else
 		return nullptr;
+}
+
+void LanguageServer::handleTextDocumentHover(MessageID _id, Json::Value const& _args)
+{
+	auto const [sourceUnitName, lineColumn] = HandlerBase(*this).extractSourceUnitNameAndLineColumn(_args);
+	ASTNode const* sourceNode = astNodeAtSourceLocation(sourceUnitName, lineColumn);
+
+	string tooltipText = symbolHoverInformation(sourceNode);
+
+	if (tooltipText.empty())
+	{
+		m_client.reply(_id, Json::nullValue);
+		return;
+	}
+
+	Json::Value reply = Json::objectValue;
+	reply["range"] = toRange(sourceNode->location());
+	reply["contents"]["kind"] = "markdown";
+	reply["contents"]["value"] = std::move(tooltipText);
+
+	m_client.reply(_id, reply);
 }
 
